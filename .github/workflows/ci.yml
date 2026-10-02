@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and run allocator test suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential valgrind
+
+      - name: Compile all allocator versions
+        run: |
+          set -e
+          for f in malloc_1.cpp malloc_2.cpp malloc_3.cpp; do
+            echo "Compiling $f"
+            g++ -std=c++11 -Wall -c "$f" -o "/tmp/$(basename $f .cpp).o"
+          done
+          echo "All three allocator versions compile cleanly."
+
+      - name: Build test suite against the buddy allocator
+        run: g++ -std=c++11 -Wall -g -o test_allocator tests/test_allocator.cpp malloc_3.cpp
+
+      - name: Run test suite
+        run: ./test_allocator
+
+      - name: Run test suite under Valgrind
+        run: |
+          valgrind --error-exitcode=1 \
+                   --errors-for-leak-kinds=definite \
+                   ./test_allocator
